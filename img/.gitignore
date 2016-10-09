@@ -1,0 +1,6 @@
+## This directory stores training loss/accuracy plots
+
+# Ignore everything in this directory
+*
+# Except this file
+!.gitignore
