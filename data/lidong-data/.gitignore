@@ -1,0 +1,6 @@
+## Dong et al. 2014 data directory
+
+# Ignore everything in this directory
+*
+# Except this file
+!.gitignore
