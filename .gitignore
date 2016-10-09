@@ -1,8 +1,10 @@
 *.pyc
 
-#image and checkpoint files
+#image, data and checkpoint files
 checkpoints/*
 img/*
+data/lidong-data/*
+data/election-data/*
 
 #resources: pretrained embeddings
 resources/*
