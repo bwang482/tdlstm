@@ -1,3 +1,6 @@
 #image and checkpoint files
 checkpoints/*
 img/*
+
+#resources: pretrained embeddings
+resources/*
