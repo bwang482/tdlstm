@@ -76,14 +76,18 @@ class ElectionData:
 		self.train_tweets, self.train_targets, self.train_y = zip(*train)
 		self.test_tweets, self.test_targets, self.test_y = zip(*test)
 
+		self.train_left_tweets = [ElectionData.split_tweet(self.train_tweets[i], self.train_targets[i])[0] for i in range(len(self.train_tweets))]
+		self.train_right_tweets = [ElectionData.split_tweet(self.train_tweets[i], self.train_targets[i])[1] for i in range(len(self.train_tweets))]
+		self.test_left_tweets = [ElectionData.split_tweet(self.test_tweets[i], self.test_targets[i])[0] for i in range(len(self.test_tweets))]
+		self.test_right_tweets = [ElectionData.split_tweet(self.test_tweets[i], self.test_targets[i])[1] for i in range(len(self.test_tweets))]
+
+		self.train_tweets = [ElectionData.replace_target(self.train_tweets[i], self.train_targets[i]) for i in range(len(self.train_tweets))]
+		self.test_tweets = [ElectionData.replace_target(self.test_tweets[i], self.test_targets[i]) for i in range(len(self.test_tweets))]
+
 		# Padding tweets (manually adding '<PAD> tokens')
 		if not self.dynamic_padding:
 			self.train_tweets = util.pad_sequences(self.train_tweets, pad_location='RIGHT')
 			self.test_tweets = util.pad_sequences(self.test_tweets, pad_location='RIGHT')
-
-		# Vectorizing labels
-		self.train_y = pd.get_dummies(self.train_y).values.astype(np.int32)
-		self.test_y = pd.get_dummies(self.test_y).values.astype(np.int32)
 
 		# Building vocabulary
 		self.vocab, self.vocab_inv = util.build_vocabulary(self.train_tweets + self.test_tweets)
@@ -93,7 +97,7 @@ class ElectionData:
 			start = time.clock()
 			print(' - Loading embedding..')
 			glove, self.glove_vec, self.glove_shape, glove_vocab = util.gensim_load_vec('resources/wordemb/glove.twitter.word2vec.27B.100d.txt')
-			glove_vocab = [token for token in glove_vocab]
+			glove_vocab = [token.encode('utf-8') for token in glove_vocab]
 			self.glove_vocab_dict = {j:i for i, j in enumerate(glove_vocab)}
 			self.glove_vec = np.append(self.glove_vec, [[0]*self.glove_shape[1]], axis=0)
 			self.glove_shape = [self.glove_shape[0]+1, self.glove_shape[1]]
@@ -104,19 +108,31 @@ class ElectionData:
 				start = time.clock()
 				print(' - Matching words-indices')
 				self.train_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in tweet] for tweet in self.train_tweets])
+				self.train_left_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in tweet] for tweet in self.train_left_tweets])
+				self.train_right_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in tweet] for tweet in self.train_right_tweets])
 				self.test_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in tweet] for tweet in self.test_tweets])
+				self.test_left_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in tweet] for tweet in self.test_left_tweets])
+				self.test_right_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in tweet] for tweet in self.test_right_tweets])
+
+				self.train_df = [(self.train_x[i], self.train_left_x[i], self.train_right_x[i], self.train_y[i]) 
+								for i in range(len(self.train_x))]
+				self.test_df = [(self.test_x[i], self.test_left_x[i], self.test_right_x[i], self.test_y[i]) 
+								for i in range(len(self.test_x))]
+
+				train_y = np.array([d[-1] for d in self.train_df])
+				self.train_df, self.dev_df = self.build_train_dev(train_y) # Dividing to train and dev set
 				print(' - DONE')
 				print("time taken: %f mins"%((time.clock() - start)/60))
-				print(" - Saving padded data")
-				# self.train_x = self.train_x.astype(np.int32)
-				# self.test_x = self.test_x.astype(np.int32)
-				np.save('data/election-data/train_x.npy', self.train_x)
-				np.save('data/election-data/test_x.npy', self.test_x)
+				print(" - Saving data")
+				np.save('data/election-data/train_df.npy', self.train_df)
+				np.save('data/election-data/dev_df.npy', self.dev_df)
+				np.save('data/election-data/test_df.npy', self.test_df)
 				print(' - DONE')
 			else:
-				print(" - Loading padded data")
-				self.train_x = np.load('data/election-data/train_x.npy')
-				self.test_x = np.load('data/election-data/test_x.npy')
+				print(" - Loading data")
+				self.train_df = np.load('data/election-data/train_df.npy')
+				self.dev_df = np.load('data/election-data/dev_df.npy')
+				self.test_df = np.load('data/election-data/test_df.npy')
 				print(' - DONE')
 
 		else:
@@ -124,10 +140,6 @@ class ElectionData:
 			self.train_x = np.array([[self.vocab[token] for token in tweet] for tweet in self.train_tweets])
 			self.test_x = np.array([[self.vocab[token] for token in tweet] for tweet in self.test_tweets])
 
-		self.train_x, self.dev_x, self.train_y, self.dev_y = self.build_train_dev(dev_size=0.2)
-		self.train_size = np.array([len(seq) for seq in self.train_x])
-		self.dev_size = np.array([len(seq) for seq in self.dev_x])
-		self.test_size = np.array([len(seq) for seq in self.test_x])
 		self.create_batches()
 		self.reset_batch_pointer()
 
@@ -144,49 +156,109 @@ class ElectionData:
 			data.append([tw, target, label])
 		return data
 
-	def build_train_dev(self, dev_size=0.2, random_seed=42):
+	@staticmethod
+	def replace_target(tweet, target):
+		tweet = list(itertools.chain.from_iterable((target.split('_')) if item == target else (item, ) for item in tweet))
+		return tweet
+
+	@staticmethod
+	def split_tweet(tweet, target):
+		target_index = tweet.index(target)
+		left = tweet[0:target_index] + target.split('_')
+		right = target.split('_') + tweet[target_index+1:]
+		right = [i for i in reversed(right)]
+		return left, right
+
+	def build_train_dev(self, train_y, dev_size=0.2, random_seed=42):
 		return train_test_split(
-			self.train_x,
-			self.train_y,
+			self.train_df,
 			test_size=dev_size,
-			random_state=random_seed)
+			random_state=random_seed,
+			stratify=train_y)
 
 	def create_batches(self):
+		self.train_df = self.shuffle_data(self.train_df) # Randomlise data
+		#train set:
+		self.train_x = np.array([d[0] for d in self.train_df])
+		self.train_size = np.array([len(seq) for seq in self.train_x])
+		self.train_y = np.array([d[-1] for d in self.train_df])
+		self.train_left_x = np.array([d[1] for d in self.train_df])
+		self.train_left_size = np.array([len(seq) for seq in self.train_left_x])
+		self.train_right_x = np.array([d[2] for d in self.train_df])
+		self.train_right_size = np.array([len(seq) for seq in self.train_right_x])
+		self.train_x = util.pad_sequences(self.train_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT') # Padding
+		self.train_left_x = util.pad_sequences(self.train_left_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
+		self.train_right_x = util.pad_sequences(self.train_right_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
+		self.train_x = np.array(self.train_x)
+		self.train_left_x = np.array(self.train_left_x)
+		self.train_right_x = np.array(self.train_right_x)
+		#dev set:
+		self.dev_x = np.array([d[0] for d in self.dev_df])
+		self.dev_size = np.array([len(seq) for seq in self.dev_x])
+		self.dev_y = np.array([d[-1] for d in self.dev_df])
+		self.dev_left_x = np.array([d[1] for d in self.dev_df])
+		self.dev_left_size = np.array([len(seq) for seq in self.dev_left_x])
+		self.dev_right_x = np.array([d[2] for d in self.dev_df])
+		self.dev_right_size = np.array([len(seq) for seq in self.dev_right_x])
+		self.dev_x = util.pad_sequences(self.dev_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT') # Padding
+		self.dev_left_x = util.pad_sequences(self.dev_left_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
+		self.dev_right_x = util.pad_sequences(self.dev_right_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
+		self.dev_x = np.array(self.dev_x)
+		self.dev_left_x = np.array(self.dev_left_x)
+		self.dev_right_x = np.array(self.dev_right_x)
+		#test set:
+		self.test_x = np.array([d[0] for d in self.test_df])
+		self.test_size = np.array([len(seq) for seq in self.test_x])
+		self.test_y = np.array([d[-1] for d in self.test_df])
+		self.test_left_x = np.array([d[1] for d in self.test_df])
+		self.test_left_size = np.array([len(seq) for seq in self.test_left_x])
+		self.test_right_x = np.array([d[2] for d in self.test_df])
+		self.test_right_size = np.array([len(seq) for seq in self.test_right_x])
+		self.test_x = util.pad_sequences(self.test_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT') # Padding
+		self.test_left_x = util.pad_sequences(self.test_left_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
+		self.test_right_x = util.pad_sequences(self.test_right_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
+		self.test_x = np.array(self.test_x)
+		self.test_left_x = np.array(self.test_left_x)
+		self.test_right_x = np.array(self.test_right_x)
+
+		# Vectorizing labels
+		self.train_y = pd.get_dummies(self.train_y).values.astype(np.int32)
+		self.dev_y = pd.get_dummies(self.dev_y).values.astype(np.int32)
+		self.test_y = pd.get_dummies(self.test_y).values.astype(np.int32)
+
+		# Creating training batches
 		self.num_batches = len(self.train_x)//self.batch_size
 		if self.num_batches==0:
 			assert False, "Not enough data for the batch size."
-		train_x, train_y = self.train_x, self.train_y
-		train_x, train_y, self.train_size = self.shuffle_data(self.train_x, self.train_y, self.train_size)
-		self.batch_x = np.array_split(train_x, self.num_batches)
-		self.batch_y = np.array_split(train_y, self.num_batches)
-		self.train_x = util.pad_sequences(train_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
-		self.dev_x = util.pad_sequences(self.dev_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
-		self.test_x = util.pad_sequences(self.test_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
-		self.train_x = np.array(self.train_x)
-		self.dev_x = np.array(self.dev_x)
-		self.test_x = np.array(self.test_x)
+		self.batch_df = np.array_split(self.train_df, self.num_batches) # Splitting train set into batches based on num_batches
 
 	def next_batch(self):
-		x, y = self.batch_x[self.pointer], self.batch_y[self.pointer]
+		df = self.batch_df[self.pointer]
+		x = np.array([d[0] for d in df])
+		xl = np.array([d[1] for d in df])
+		xr = np.array([d[2] for d in df])
+		y = np.array([d[-1] for d in df])
+		y = pd.get_dummies(y).values.astype(np.int32)
 		seq_len = [len(seq) for seq in x]
+		seq_len_l = [len(seq) for seq in xl]
+		seq_len_r = [len(seq) for seq in xr]
 		if self.dynamic_padding:
-			x = np.array(self.pad_minibatches(x))
+			x = np.array(self.pad_minibatches(x, 'RIGHT'))
+			xl = np.array(self.pad_minibatches(xl, 'RIGHT'))
+			xr = np.array(self.pad_minibatches(xr, 'RIGHT'))
 		self.pointer += 1
-		return x, y, seq_len
+		return x, y, seq_len, xl, seq_len_l, xr, seq_len_r
 
 	def reset_batch_pointer(self):
-		self.train_x, self.train_y, self.train_size = self.shuffle_data(self.train_x, self.train_y, self.train_size)
+		self.train_df = self.shuffle_data(self.train_df)
 		self.pointer = 0
 
 	def pad_minibatches(self, x):
-		x = util.pad_sequences(x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
+		x = util.pad_sequences(x, dynamic_padding=self.dynamic_padding, pad_location=pad_location)
 		return x
 
 	@staticmethod
-	def shuffle_data(a, b, c):
+	def shuffle_data(a):
 		a = np.array(a)
-		b = np.array(b)
-		a_size = np.array(c)
-		assert len(a) == len(b) == len(c)
 		p = np.random.permutation(len(a))
-		return a[p], b[p], c[p]
+		return a[p]
