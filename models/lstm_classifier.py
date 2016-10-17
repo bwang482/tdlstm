@@ -30,8 +30,8 @@ class LSTMClassifier:
 													initializer=tf.random_uniform_initializer(-0.003, 0.003),
 													state_is_tuple=True)
 				if not reuse:
-					lstm_cell = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_fw_cell, input_keep_prob=0.7)
-				# lstm_cell = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_fw_cell] * 4, state_is_tuple=True)
+					lstm_cell = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_cell, input_keep_prob=0.7)
+				# lstm_cell = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_cell] * 4, state_is_tuple=True)
 
 			rnn_outputs, output_states  = tf.nn.dynamic_rnn(
 				cell=lstm_cell,
@@ -66,7 +66,10 @@ class LSTMClassifier:
 	def training(self, cost):
 		optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
 		# optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
-		train_op = optimizer.minimize(cost)
+		gvs = optimizer.compute_gradients(cost)
+		capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
+		train_op = optimizer.apply_gradients(capped_gvs)
+		# train_op = optimizer.minimize(cost)
 		return train_op
 
 

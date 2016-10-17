@@ -113,7 +113,7 @@ def final_test(session, feed, labels):
 data = load_data(FLAGS.data)
 embedding_init = embed(data)
 
-model = RNNClassifier(FLAGS, embedding_init)
+model = LSTMClassifier(FLAGS, embedding_init)
 logits = model.inference()
 train_loss = model.loss(logits)
 train_op = model.training(train_loss[0])
