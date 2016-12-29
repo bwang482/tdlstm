@@ -2,6 +2,7 @@ import os
 import time
 import re
 import codecs
+import itertools
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -9,7 +10,7 @@ import gensim
 from gensim import utils
 from twtokenize import tokenize
 import util
-from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import train_test_split
 from ftfy import fix_text
 
 class streamtwElec(object):
@@ -35,7 +36,7 @@ class streamtwElec(object):
                 target = line[3].lower().strip()
                 location = line[4]
                 tw = line[-1].lower().strip()
-                tw = fix_text(tw.decode('utf-8'))
+                tw = fix_text(tw.decode('utf-8')).encode('utf-8')
                 range = []
                 p = re.compile(r'(?<!\w)({0})(?!\w)'.format(target))
                 for m in p.finditer(tw.lower()):
@@ -69,8 +70,8 @@ class streamtwElec(object):
 
 class ElectionData:
 	def __init__(self, batch_size, dynamic_padding=False, preprocessing=False, embedding=True, saved=False, max_length=None):
-		train = ElectionData.read_data('data/election-data/training/')
-		test = ElectionData.read_data('data/election-data/testing/')
+		train = ElectionData.read_data('../data/election-data/training/')
+		test = ElectionData.read_data('../data/election-data/testing/')
 		self.batch_size = batch_size
 		self.dynamic_padding = dynamic_padding
 		self.train_tweets, self.train_targets, self.train_y = zip(*train)
@@ -96,7 +97,7 @@ class ElectionData:
 			# Vectorizing tweets - Glove embedding
 			start = time.clock()
 			print(' - Loading embedding..')
-			glove, self.glove_vec, self.glove_shape, glove_vocab = util.gensim_load_vec('resources/wordemb/glove.twitter.word2vec.27B.100d.txt')
+			glove, self.glove_vec, self.glove_shape, glove_vocab = util.gensim_load_vec('../resources/wordemb/glove.twitter.word2vec.27B.100d.txt')
 			glove_vocab = [token.encode('utf-8') for token in glove_vocab]
 			self.glove_vocab_dict = {j:i for i, j in enumerate(glove_vocab)}
 			self.glove_vec = np.append(self.glove_vec, [[0]*self.glove_shape[1]], axis=0)
@@ -124,15 +125,15 @@ class ElectionData:
 				print(' - DONE')
 				print("time taken: %f mins"%((time.clock() - start)/60))
 				print(" - Saving data")
-				np.save('data/election-data/train_df.npy', self.train_df)
-				np.save('data/election-data/dev_df.npy', self.dev_df)
-				np.save('data/election-data/test_df.npy', self.test_df)
+				np.save('../data/election-data/train_df.npy', self.train_df)
+				np.save('../data/election-data/dev_df.npy', self.dev_df)
+				np.save('../data/election-data/test_df.npy', self.test_df)
 				print(' - DONE')
 			else:
 				print(" - Loading data")
-				self.train_df = np.load('data/election-data/train_df.npy')
-				self.dev_df = np.load('data/election-data/dev_df.npy')
-				self.test_df = np.load('data/election-data/test_df.npy')
+				self.train_df = np.load('../data/election-data/train_df.npy')
+				self.dev_df = np.load('../data/election-data/dev_df.npy')
+				self.test_df = np.load('../data/election-data/test_df.npy')
 				print(' - DONE')
 
 		else:
@@ -169,7 +170,7 @@ class ElectionData:
 		right = [i for i in reversed(right)]
 		return left, right
 
-	def build_train_dev(self, train_y, dev_size=0.2, random_seed=42):
+	def build_train_dev(self, train_y, dev_size=0.3, random_seed=42):
 		return train_test_split(
 			self.train_df,
 			test_size=dev_size,
@@ -253,7 +254,7 @@ class ElectionData:
 		self.train_df = self.shuffle_data(self.train_df)
 		self.pointer = 0
 
-	def pad_minibatches(self, x):
+	def pad_minibatches(self, x, pad_location):
 		x = util.pad_sequences(x, dynamic_padding=self.dynamic_padding, pad_location=pad_location)
 		return x
 

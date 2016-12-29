@@ -1,8 +1,9 @@
 *.pyc
 
-#image, data and checkpoint files
+#image, Tensorboard, data and checkpoint files
 checkpoints/*
 img/*
+output/*
 data/lidong-data/*
 data/election-data/*
 

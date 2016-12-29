@@ -2,6 +2,7 @@ from __future__ import division
 import gensim
 import numpy as np
 import itertools
+from itertools import product
 from collections import Counter 
 
 
@@ -91,3 +92,4 @@ def xy_iter(x, y, batch_size, num_epochs, random_seed=42, fill=True):
 
 def cartesian_product(dicts):
     return [dict(zip(dicts,x)) for x in product(*dicts.values())]
+

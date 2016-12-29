@@ -8,7 +8,7 @@ from sklearn import metrics
 import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.INFO)
 from data import util
-from models.lstm_classifier import LSTMClassifier
+from models.tdlstm_classifier import TDLSTMClassifier
 import data.dataprocessor as dp
 import data.electionprocessor as ep
 from laplotter import LossAccPlotter
@@ -19,20 +19,20 @@ tf.flags.DEFINE_string("data", "lidong", "Choose a data set")
 
 # Training parameters
 tf.flags.DEFINE_integer("random_state", 42, "Random state initialization for reproducibility")
-tf.flags.DEFINE_integer("batch_size", 60, "Mini-batch size")
+tf.flags.DEFINE_integer("batch_size", 64, "Mini-batch size")
 tf.flags.DEFINE_integer("seq_len", 42, "Sequence length")
-tf.flags.DEFINE_integer("num_hidden", 200, "Number of units in the hidden layer")
+tf.flags.DEFINE_integer("num_hidden", 256, "Number of units in the hidden layer")
 tf.flags.DEFINE_integer("num_classes", 3, "Number of classes/labels")
 tf.flags.DEFINE_integer("learning_rate", 0.0001, "Learning rate for the optimizer")
 # tf.flags.DEFINE_integer("max_epoch", 5, "Number of epochs trained with the initial learning rate")
 tf.flags.DEFINE_integer("max_max_epoch", 1600, "Total number of epochs for training")
 # tf.flags.DEFINE_integer("lr_decay", 0.05, "The decay of learning rate for each epoch after 'max_epoch' ")
-tf.flags.DEFINE_integer("early_stopping_rounds", 250, "Number of epochs allowed for setting early stopping criterion")
+tf.flags.DEFINE_integer("early_stopping_rounds", 150, "Number of epochs allowed for setting early stopping criterion")
 tf.flags.DEFINE_string("scoring_metrics", 'accuracy', "Classifiaction metrics used for early stopping")
 
 # Session parameters
 tf.flags.DEFINE_boolean("restore", False, "Restore previously trained model")
-tf.flags.DEFINE_string("checkpoint_file", 'checkpoints/lstm_best', "Checkpoint file path")
+tf.flags.DEFINE_string("checkpoint_file", 'checkpoints/tdlstm_best', "Checkpoint file path")
 tf.flags.DEFINE_boolean("allow_soft_placement", False, "Allow soft device replacement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
 
@@ -68,7 +68,8 @@ def fscores(y_test, y_predicted):
 
 
 def test(session, early_stopping_rounds, early_stopping_metric_list, early_stopping_metric_minimize=False, metrics=FLAGS.scoring_metrics):
-	feed = {model.x: data.dev_x, model.y: data.dev_y, model.seq_len: data.dev_size}
+	feed = {model.xl: data.dev_left_x, model.xr: data.dev_right_x, model.y: data.dev_y, 
+			model.seq_len_l: data.dev_left_size, model.seq_len_r: data.dev_right_size}
 	test_loss_value, acc_test, pred = session.run(test_loss, feed)
 	f1_3class, f1_2class = fscores(data.dev_y, pred)
 	print("*** Validation Loss = {:.6f}; Validation Accuracy = {:.5f}; 3-class F1 = {:.5f}; 2-class F1 = {:.5f}"
@@ -113,7 +114,7 @@ def final_test(session, feed, labels):
 data = load_data(FLAGS.data)
 embedding_init = embed(data)
 
-model = LSTMClassifier(FLAGS, embedding_init)
+model = TDLSTMClassifier(FLAGS, embedding_init)
 logits = model.inference()
 train_loss = model.loss(logits)
 train_op = model.training(train_loss[0])
@@ -124,7 +125,7 @@ test_loss = model.loss(pred)
 scoring_list = []
 # Visualizing loss function and accuracy during training over epochs
 plotter = LossAccPlotter(title="Training plots",
-                         save_to_filepath="img/lstm_plot.png",
+                         save_to_filepath="img/tdlstm_plot.png",
                          show_regressions=False,
                          show_averages=False,
                          show_loss_plot=True,
@@ -144,8 +145,8 @@ with tf.Session() as sess:
 		print("Loading variables from '%s' .." % FLAGS.checkpoint_file)
 		print()
 		saver.restore(sess, FLAGS.checkpoint_file)
-		# feed = {model.x: data.dev_x, model.y: data.dev_y, model.seq_len: data.dev_size}
-		feed = {model.x: data.test_x, model.y: data.test_y, model.seq_len: data.test_size}
+		feed = {model.xl: data.test_left_x, model.xr: data.test_right_x, model.y: data.test_y, 
+				model.seq_len_l: data.test_left_size, model.seq_len_r: data.test_right_size}
 		final_test(sess, feed, data.test_y)
 	else:
 		sess.run(init)
@@ -165,19 +166,25 @@ with tf.Session() as sess:
 		for epoch in range(FLAGS.max_max_epoch):
 			data.reset_batch_pointer()
 
+			total_loss = 0.0
+			total_acc = 0.0
+			# fw_state, bw_state = sess.run([model.fw_initial_state, model.bw_initial_state])
 			for step in range(data.num_batches):
-				x, y, seq_length, _, _, _, _ = data.next_batch()
-				feed={model.x: x, model.y: y, model.seq_len: seq_length}
+				x, y, seq_length, xl, seq_length_l, xr, seq_length_r = data.next_batch()
+				feed={model.xl: xl, model.xr: xr, model.y: y, model.seq_len_l: seq_length_l, model.seq_len_r: seq_length_r}
 				sess.run(train_op, feed)
+				current_loss, current_acc, _ = sess.run(train_loss, feed)
+				total_loss += current_loss
+				total_acc += current_acc
 
-			feed = {model.x: x, model.y: y, model.seq_len: seq_length}
-			train_loss_value, acc_train, _ = sess.run(test_loss, feed)
+			# feed={model.xl: xl, model.xr: xr, model.y: y, model.seq_len_l: seq_length_l, model.seq_len_r: seq_length_r}
+			# train_loss_value, acc_train, _ = sess.run(test_loss, feed)
 			print()
-			print("Epoch {:2d}: Training loss = {:.6f}; Training Accuracy = {:.5f}".format(epoch+1, train_loss_value, acc_train))
+			print("Epoch {:2d}: Training loss = {:.6f}; Training Accuracy = {:.5f}".format(epoch+1, total_loss/data.num_batches, total_acc/data.num_batches))
 
 			dev_loss_value, dev_score, early_stop = test(sess, FLAGS.early_stopping_rounds, scoring_list)
 			plotter.add_values(epoch,
-							loss_train=train_loss_value, acc_train=acc_train,
+							loss_train=total_loss/data.num_batches, acc_train=total_acc/data.num_batches,
 							loss_val=dev_loss_value, acc_val=dev_score)
 			if early_stop:
 				print('Early stopping...')
@@ -186,7 +193,8 @@ with tf.Session() as sess:
 				print("time taken: %f mins"%((t2-t1)/60))
 				break
 
-		feed = {model.x: data.test_x, model.y: data.test_y, model.seq_len: data.test_size}
+		feed = {model.xl: data.test_left_x, model.xr: data.test_right_x, model.y: data.test_y, 
+				model.seq_len_l: data.test_left_size, model.seq_len_r: data.test_right_size}
 		final_test(sess, feed, data.test_y)
 
 		coord.request_stop()

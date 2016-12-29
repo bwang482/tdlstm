@@ -7,7 +7,7 @@ import gensim
 from gensim import utils
 from twtokenize import tokenize
 import util
-from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import train_test_split
 
 
 class streamtw(object):
@@ -40,8 +40,8 @@ class streamtw(object):
 
 class LidongData:
 	def __init__(self, batch_size, dynamic_padding=False, preprocessing=False, embedding=True, saved=False, max_length=None):
-		train = LidongData.read_data('data/lidong-data/training/')
-		test = LidongData.read_data('data/lidong-data/testing/')
+		train = LidongData.read_data('../data/lidong-data/training/')
+		test = LidongData.read_data('../data/lidong-data/testing/')
 		self.batch_size = batch_size
 		self.dynamic_padding = dynamic_padding
 		self.train_tweets, self.train_targets, self.train_y = zip(*train)
@@ -67,7 +67,7 @@ class LidongData:
 			# Vectorizing tweets - Glove embedding
 			start = time.clock()
 			print(' - Loading embedding..')
-			glove, self.glove_vec, self.glove_shape, glove_vocab = util.gensim_load_vec('resources/wordemb/glove.twitter.word2vec.27B.100d.txt')
+			glove, self.glove_vec, self.glove_shape, glove_vocab = util.gensim_load_vec('../resources/wordemb/glove.twitter.word2vec.27B.100d.txt')
 			glove_vocab = [token.encode('utf-8') for token in glove_vocab]
 			self.glove_vocab_dict = {j:i for i, j in enumerate(glove_vocab)}
 			self.glove_vec = np.append(self.glove_vec, [[0]*self.glove_shape[1]], axis=0)
@@ -95,15 +95,15 @@ class LidongData:
 				print(' - DONE')
 				print("time taken: %f mins"%((time.clock() - start)/60))
 				print(" - Saving data")
-				np.save('data/lidong-data/train_df.npy', self.train_df)
-				np.save('data/lidong-data/dev_df.npy', self.dev_df)
-				np.save('data/lidong-data/test_df.npy', self.test_df)
+				np.save('../data/lidong-data/train_df.npy', self.train_df)
+				np.save('../data/lidong-data/dev_df.npy', self.dev_df)
+				np.save('../data/lidong-data/test_df.npy', self.test_df)
 				print(' - DONE')
 			else:
 				print(" - Loading data")
-				self.train_df = np.load('data/lidong-data/train_df.npy')
-				self.dev_df = np.load('data/lidong-data/dev_df.npy')
-				self.test_df = np.load('data/lidong-data/test_df.npy')
+				self.train_df = np.load('../data/lidong-data/train_df.npy')
+				self.dev_df = np.load('../data/lidong-data/dev_df.npy')
+				self.test_df = np.load('../data/lidong-data/test_df.npy')
 				print(' - DONE')
 
 		else:

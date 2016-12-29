@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, r'/home/ccrmad/Code/TDLSTM')
+sys.path.insert(0, r'../')
 import data.util
 import tensorflow as tf
 import numpy as np
@@ -10,7 +10,10 @@ class TDLSTMClassifier:
 	def __init__(self, args, embedding_init):
 		self.learning_rate = args.learning_rate
 		self.num_hidden = args.num_hidden
+		self.batch_size = args.batch_size+1
 		self.num_classes = args.num_classes
+		self.dropout_output = args.dropout_output
+		
 		self.embedding_init = embedding_init
 		self.xl = tf.placeholder(tf.int32, [None, None])
 		self.xr = tf.placeholder(tf.int32, [None, None])
@@ -27,37 +30,42 @@ class TDLSTMClassifier:
 		with tf.variable_scope('hidden', reuse=reuse):
 			with tf.variable_scope('forward_lstm_cell'):
 				lstm_fw_cell = tf.nn.rnn_cell.LSTMCell(num_units=self.num_hidden, use_peepholes=False, 
-													# forget_bias=0.0, 
-													# activation=tf.nn.relu, 
+													# forget_bias=0.5, 
+													activation=tf.nn.relu, 
 													# initializer=tf.truncated_normal_initializer(stddev=0.1),
-													# initializer=tf.contrib.layers.xavier_initializer(),
-													initializer=tf.random_uniform_initializer(-0.003, 0.003),
+													initializer=tf.contrib.layers.xavier_initializer(),
+													# initializer=tf.random_uniform_initializer(-0.003, 0.003),
 													state_is_tuple=True)
 				if not reuse:
-					lstm_fw_cell = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_fw_cell, input_keep_prob=0.5, output_keep_prob=0.7)
+					lstm_fw_cell = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_fw_cell, output_keep_prob=self.dropout_output)
 				# lstm_fw_cell = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_fw_cell] * 4, state_is_tuple=True)
 
 			with tf.variable_scope('backward_lstm_cell'):
 				lstm_bw_cell = tf.nn.rnn_cell.LSTMCell(num_units=self.num_hidden, use_peepholes=False, 
-													# forget_bias=0.0, 
-													# activation=tf.nn.relu,
+													# forget_bias=0.5, 
+													activation=tf.nn.relu,
 													# initializer=tf.truncated_normal_initializer(stddev=0.1),
-													# initializer=tf.contrib.layers.xavier_initializer(),
-													initializer=tf.random_uniform_initializer(-0.003, 0.003),
+													initializer=tf.contrib.layers.xavier_initializer(),
+													# initializer=tf.random_uniform_initializer(-0.003, 0.003),
 													state_is_tuple=True)
 				if not reuse:
-					lstm_bw_cell = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_bw_cell, input_keep_prob=0.5, output_keep_prob=0.7)
+					lstm_bw_cell = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_bw_cell, output_keep_prob=self.dropout_output)
 				# lstm_bw_cell = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_bw_cell] * 4, state_is_tuple=True)
 
-			# fw_initial_state = lstm_fw_cell.zero_state(self.batch_size, tf.float32)
-			# bw_initial_state = lstm_bw_cell.zero_state(self.batch_size, tf.float32)
+			# self.fw_initial_state = lstm_fw_cell.zero_state(self.batch_size, tf.float32) #initial states
+			# self.bw_initial_state = lstm_bw_cell.zero_state(self.batch_size, tf.float32)
+
+			# if not reuse:
+			# 	embed_inputs_fw = tf.nn.dropout(embed_inputs_fw, keep_prob=0.5)
+			# 	embed_inputs_bw = tf.nn.dropout(embed_inputs_bw, keep_prob=0.5)
 
 			with tf.variable_scope("forward_lstm"):
 				outputs_fw, output_states_fw  = tf.nn.dynamic_rnn(
 					cell=lstm_fw_cell,
 					inputs=embed_inputs_fw,
 					dtype=tf.float32,
-					sequence_length=self.seq_len_l
+					sequence_length=self.seq_len_l,
+					# initial_state=self.fw_initial_state
 					)       ## (batch_size, seq_len_l, num_hidden)
 
 			with tf.variable_scope("backward_lstm"):
@@ -65,7 +73,8 @@ class TDLSTMClassifier:
 					cell=lstm_bw_cell,
 					inputs=embed_inputs_bw,
 					dtype=tf.float32,
-					sequence_length=self.seq_len_r
+					sequence_length=self.seq_len_r,
+					# initial_state=self.bw_initial_state
 					)       ## (batch_size, seq_len_r, num_hidden)
 
 			last_outputs_fw = self.last_relevant(outputs_fw, self.seq_len_l) ## (batch_size, num_hidden)
@@ -75,8 +84,8 @@ class TDLSTMClassifier:
 		with tf.variable_scope('output', reuse=reuse):
 			with tf.variable_scope('softmax'):
 				W = tf.get_variable('W', [self.num_hidden*2, self.num_classes],
-									initializer=tf.random_uniform_initializer(-0.003, 0.003))
-									# initializer=tf.contrib.layers.xavier_initializer())
+									# initializer=tf.random_uniform_initializer(-0.003, 0.003))
+									initializer=tf.contrib.layers.xavier_initializer())
 									# initializer=tf.truncated_normal_initializer(stddev=0.1))
 				b = tf.get_variable('b', [self.num_classes], initializer=tf.constant_initializer(0.1))
 			logits = tf.matmul(last_outputs, W) + b
@@ -95,6 +104,14 @@ class TDLSTMClassifier:
 	def training(self, cost):
 		optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
 		# optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
+		# gvs = optimizer.compute_gradients(cost)
+		# capped_gvs = [(tf.clip_by_norm(grad, 1.0), var) for grad, var in gvs]
+
+		# trainables = tf.trainable_variables()
+		# grads = tf.gradients(cost, trainables)
+		# grads, _ = tf.clip_by_global_norm(grads, clip_norm=1.0)
+		# capped_gvs = zip(grads, trainables)
+		# train_op = optimizer.apply_gradients(capped_gvs)
 		train_op = optimizer.minimize(cost)
 		return train_op
 
@@ -114,3 +131,11 @@ class TDLSTMClassifier:
 		flat = tf.reshape(outputs, [-1, hidden_size])
 		relevant = tf.gather(flat, index)
 		return relevant
+
+	# @property
+	# def fw_initial_state(self):
+	# 	return self._fw_initial_state
+
+	# @property
+	# def bw_initial_state(self):
+	# 	return self._bw_initial_state
