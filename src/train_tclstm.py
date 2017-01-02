@@ -7,19 +7,19 @@ import numpy as np
 from operator import itemgetter
 from sklearn import metrics
 import tensorflow as tf
-from models.lstm_classifier import LSTMClassifier
+from models.tclstm_classifier import TCLSTMClassifier
 from utils import *
 from laplotter import LossAccPlotter
 
 
-class LSTM:
+class TCLSTM:
 	def __init__(self, args, data, tuning):
 		self.FLAGS = args
 		self.data = data
 		self.tuning = tuning
 		self.embedding_init = embed(self.data)
 
-		self.model = LSTMClassifier(self.FLAGS, self.embedding_init)
+		self.model = TCLSTMClassifier(self.FLAGS, self.embedding_init)
 		logits = self.model.inference()
 		self.train_loss = self.model.loss(logits)
 		self.train_op = self.model.training(self.train_loss[0])
@@ -29,7 +29,7 @@ class LSTM:
 
 		# Visualizing loss function and accuracy during training over epochs
 		self.plotter = LossAccPlotter(title="Training plots",
-		                     save_to_filepath="../img/lstm_plot.png",
+		                     save_to_filepath="../img/tclstm_plot.png",
 		                     show_regressions=False,
 		                     show_averages=False,
 		                     show_loss_plot=True,
@@ -42,22 +42,24 @@ class LSTM:
 		print("Network initialized..")
 
 
-	def train_lstm(self, FLAGS, data):
+	def train_tclstm(self, FLAGS, data):
 		model = self.model
 		scoring_list = []
 		best_eval_score = []
+		dev_target_vec = target_embedding(data, data.dev_target_x)
+		test_target_vec = target_embedding(data, data.test_target_x)
 
 		with tf.Session() as sess:
 			t0 = time.time()
 			saver = tf.train.Saver()
-			writer = tf.train.SummaryWriter("../output")
 			if FLAGS.restore and FLAGS.checkpoint_file:
 				print()
-				print("Loading model from '%s' .." % FLAGS.checkpoint_file)
+				print("Loading model variables from '%s' .." % FLAGS.checkpoint_file)
 				print()
 				saver.restore(sess, FLAGS.checkpoint_file)
-				# feed = {model.x: data.dev_x, model.y: data.dev_y, model.seq_len: data.dev_size}
-				feed = {model.x: data.test_x, model.y: data.test_y, model.seq_len: data.test_size}
+				feed = {model.xl: data.test_left_x, model.xr: data.test_right_x, model.y: data.test_y, 
+						model.seq_len_l: data.test_left_size, model.seq_len_r: data.test_right_size, 
+						model.tar: test_target_vec}
 				test_loss_value, test_score = self.final_test(sess, feed)
 			else:
 				sess.run(self.init)
@@ -70,32 +72,29 @@ class LSTM:
 
 					total_loss = 0.0
 					total_acc = 0.0
+					# fw_state, bw_state = sess.run([model.fw_initial_state, model.bw_initial_state])
 					for step in range(data.num_batches):
-						x, y, seq_length, _, _, _, _ = data.next_batch()
-						feed={model.x: x, model.y: y, model.seq_len: seq_length}
+						x, y, seq_length, xl, seq_length_l, xr, seq_length_r, tar = data.next_batch()
+						tar_vecs = target_embedding(data, tar)
+						feed={model.xl: xl, model.xr: xr, model.y: y, model.seq_len_l: seq_length_l, model.seq_len_r: seq_length_r, model.tar: tar_vecs}
 						sess.run(self.train_op, feed)
 						current_loss, current_acc, _ = sess.run(self.train_loss, feed)
 						total_loss += current_loss
 						total_acc += current_acc
-					
+
 					if not self.tuning:
 						print()
 						print("Epoch {:2d}: Training loss = {:.6f}; Training Accuracy = {:.5f}".format(epoch+1, total_loss/data.num_batches, total_acc/data.num_batches))
 
-					feed = {model.x: data.dev_x, model.y: data.dev_y, model.seq_len: data.dev_size}
-					dev_loss_value, dev_score, early_stop, eval_summary = self.eval(sess, feed, saver, FLAGS.early_stopping_rounds, \
-						                                         scoring_list, False, FLAGS.scoring_metrics)
+					feed = {model.xl: data.dev_left_x, model.xr: data.dev_right_x, model.y: data.dev_y, 
+							model.seq_len_l: data.dev_left_size, model.seq_len_r: data.dev_right_size, model.tar: dev_target_vec}
+					dev_loss_value, dev_score, early_stop = self.eval(sess, feed, saver, FLAGS.early_stopping_rounds, scoring_list, \
+											                     False, FLAGS.scoring_metrics)
 					best_eval_score.append(dev_score)
-					# str_summary_type = 'train'
-					# loss_summ = tf.scalar_summary("{0}_loss".format(str_summary_type), self.total_train_loss.assign(total_loss/data.num_batches))
-					# acc_summ = tf.scalar_summary("{0}_accuracy".format(str_summary_type), self.total_train_acc.assign(total_acc/data.num_batches))
-					# train_summary = tf.merge_summary([loss_summ, acc_summ])
-					# writer.add_summary(train_summary, epoch)
-					writer.add_summary(eval_summary, epoch)
+
 					self.plotter.add_values(epoch,
 									loss_train=total_loss/data.num_batches, acc_train=total_acc/data.num_batches,
 									loss_val=dev_loss_value, acc_val=dev_score[0])
-
 					if early_stop:
 						print('Early stopping after %s epoches...' % str(epoch))
 						best_eval_score = max(best_eval_score,key=itemgetter(1)) if FLAGS.scoring_metrics=='3classf1' else \
@@ -108,21 +107,21 @@ class LSTM:
 							print("time taken: %f mins"%((t1-t0)/60))
 						break
 
-				writer.close()
-				feed = {model.x: data.test_x, model.y: data.test_y, model.seq_len: data.test_size}
+				feed = {model.xl: data.test_left_x, model.xr: data.test_right_x, model.y: data.test_y, 
+						model.seq_len_l: data.test_left_size, model.seq_len_r: data.test_right_size, model.tar: test_target_vec}
 				test_loss_value, test_score = self.final_test(sess, feed)
 
 				coord.request_stop()
 				coord.join(threads)
 
 		# if not FLAGS.restore:
-		# 	self.plotter.block()
+		# 	plotter.block()
 
 		return test_score, best_eval_score
 
 
 	def eval(self, session, feed, saver, early_stopping_rounds, early_stopping_metric_list, early_stopping_metric_minimize=False, metrics='accuracy'):
-		test_loss_value, acc_test, pred, eval_summary = session.run(self.test_loss, feed)
+		test_loss_value, acc_test, pred = session.run(self.test_loss, feed)
 		f1_3class, f1_2class = fscores(self.data.dev_y, pred)
 		if not self.tuning:
 			print("*** Validation Loss = {:.6f}; Validation Accuracy = {:.5f}; 3-class F1 = {:.5f}; 2-class F1 = {:.5f}"
@@ -154,17 +153,18 @@ class LSTM:
 				best_eval_score = (acc_test, f1_3class, f1_2class)
 			if early_stopping_metric_list[::-1].index(max(early_stopping_metric_list)) > early_stopping_rounds:
 				early_stop = True
-			return (test_loss_value, (acc_test, f1_3class, f1_2class), early_stop, eval_summary)
+			return (test_loss_value, (acc_test, f1_3class, f1_2class), early_stop)
 
 
 	def final_test(self, session, feed):
 		tf.train.Saver().restore(session, self.FLAGS.checkpoint_file)
-		test_loss_value, acc_test, pred, _ = session.run(self.test_loss, feed)
+		test_loss_value, acc_test, pred = session.run(self.test_loss, feed)
 		true_labels = self.data.test_y
 		f1_3class, f1_2class = fscores(true_labels, pred)
 		print("****** Final test Loss = {:.6f}; Test Accuracy = {:.5f}; 3-class F1 = {:.5f}; 2-class F1 = {:.5f}"
 					.format(test_loss_value, acc_test, f1_3class, f1_2class))
 		print()
 		return (test_loss_value, (acc_test, f1_3class, f1_2class))
+
 
 

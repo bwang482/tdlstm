@@ -19,11 +19,11 @@ class LSTMClassifier:
 		self.seq_len = tf.placeholder(tf.int64, [None])
 
 
-	def inference(self, foward_only=None):
+	def inference(self, forward_only=None):
 
 		embed_inputs = tf.nn.embedding_lookup(self.embedding_init, self.x) ## (batch_size, seq_len, 100)
 
-		with tf.variable_scope('hidden', reuse=foward_only):
+		with tf.variable_scope('hidden', reuse=forward_only):
 			with tf.variable_scope('lstm_cell'):
 				lstm_cell = tf.nn.rnn_cell.LSTMCell(num_units=self.num_hidden, use_peepholes=False, 
 													# forget_bias=0.0, 
@@ -32,12 +32,12 @@ class LSTMClassifier:
 													# initializer=tf.random_uniform_initializer(-0.003, 0.003),
 													initializer=tf.contrib.layers.xavier_initializer(),
 													state_is_tuple=True)
-				if not foward_only:
+				if not forward_only:
 					lstm_cell = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_cell, output_keep_prob=self.dropout_output)
 				# lstm_cell = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_cell] * 4, state_is_tuple=True)
-				# if not foward_only:
+				# if not forward_only:
 				# 	lstm_cell = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_cell, output_keep_prob=self.dropout_output)
-			# if not foward_only:
+			# if not forward_only:
 			# 	embed_inputs = tf.nn.dropout(embed_inputs, keep_prob=0.7)
 
 			rnn_outputs, output_states  = tf.nn.dynamic_rnn(
@@ -50,7 +50,7 @@ class LSTMClassifier:
 			# rnn_outputs = tf.transpose(rnn_outputs, perm=[1,0,2]) ## (seq_len, batch_size, num_hidden) NOT NEEDED ANY MORE
 			last_outputs = self.last_relevant(rnn_outputs, self.seq_len) ## (batch_size, num_hidden)
 
-		with tf.variable_scope('output', reuse=foward_only):
+		with tf.variable_scope('output', reuse=forward_only):
 			with tf.variable_scope('softmax'):
 				W = tf.get_variable('W', [self.num_hidden, self.num_classes],
 									# initializer=tf.random_uniform_initializer(-0.003, 0.003))
@@ -61,14 +61,14 @@ class LSTMClassifier:
 		return logits
 
 
-	def loss(self, logits, foward_only=None):
+	def loss(self, logits, forward_only=None):
 		cost = tf.nn.softmax_cross_entropy_with_logits(logits, tf.cast(self.y, tf.float32))
 		mean_cost = tf.reduce_mean(cost)
 		y_pred = tf.argmax(logits, 1)
 		correct_pred = tf.equal(y_pred, tf.argmax(self.y, 1))
 		accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
-		if foward_only:
+		if forward_only:
 			str_summary_type = 'eval'
 			loss_summ = tf.scalar_summary("{0}_loss".format(str_summary_type), mean_cost)
 			acc_summ = tf.scalar_summary("{0}_accuracy".format(str_summary_type), accuracy)

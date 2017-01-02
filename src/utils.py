@@ -1,5 +1,6 @@
 from __future__ import print_function
 import numpy as np
+from numpy import newaxis
 import tensorflow as tf
 from sklearn import metrics
 import data.dataprocessor as dp
@@ -33,3 +34,16 @@ def fscores(y_test, y_predicted):
 	f1_3class = metrics.f1_score(y_test, y_predicted, average='macro')
 	f1_2class = (metrics.f1_score(y_test, y_predicted, average=None)[0]+metrics.f1_score(y_test, y_predicted, average=None)[-1])/2
 	return f1_3class, f1_2class
+
+
+def target_embedding(data, target_index):
+	tar_vecs = np.array([])
+	for tokens in target_index:
+		tar_vec = np.array([])
+		for token in tokens:
+			token_vec = data.glove_vec[token]
+			tar_vec = np.concatenate([tar_vec, token_vec])
+		tar_vec = tar_vec.reshape(len(tar_vec)/token_vec.shape[0], token_vec.shape[0])
+		tar_vecs = np.concatenate([tar_vecs, tar_vec.mean(axis=0)]) 
+	tar_vecs = tar_vecs.reshape((len(target_index), token_vec.shape[0]))
+	return tar_vecs[:,newaxis,:]

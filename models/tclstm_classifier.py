@@ -5,7 +5,7 @@ import tensorflow as tf
 import numpy as np
 
 
-class TDLSTMClassifier:
+class TCLSTMClassifier:
 
 	def __init__(self, args, embedding_init):
 		self.learning_rate = args.learning_rate
@@ -17,6 +17,7 @@ class TDLSTMClassifier:
 		self.embedding_init = embedding_init
 		self.xl = tf.placeholder(tf.int32, [None, None])
 		self.xr = tf.placeholder(tf.int32, [None, None])
+		self.tar = tf.placeholder(tf.float32, [None, 1, 100])
 		self.y = tf.placeholder(tf.int32, [None, self.num_classes])
 		self.seq_len_l = tf.placeholder(tf.int64, [None])
 		self.seq_len_r = tf.placeholder(tf.int64, [None])
@@ -26,6 +27,14 @@ class TDLSTMClassifier:
 
 		embed_inputs_fw = tf.nn.embedding_lookup(self.embedding_init, self.xl) ## (batch_size, seq_len, 100)
 		embed_inputs_bw = tf.nn.embedding_lookup(self.embedding_init, self.xr) ## (batch_size, seq_len, 100)
+		shape_fw = tf.unpack(tf.shape(embed_inputs_fw))[1]
+		shape_bw = tf.unpack(tf.shape(embed_inputs_bw))[1]
+		tar_fw = tf.tile(self.tar, [1,shape_fw,1])
+		tar_bw = tf.tile(self.tar, [1,shape_bw,1])
+		tar_fw.set_shape([None, None, 100])
+		tar_bw.set_shape([None, None, 100])
+		embed_inputs_fw = tf.concat(2, [embed_inputs_fw,tar_fw])
+		embed_inputs_bw = tf.concat(2, [embed_inputs_bw,tar_bw])
 
 		with tf.variable_scope('hidden', reuse=forward_only):
 			with tf.variable_scope('forward_lstm_cell'):

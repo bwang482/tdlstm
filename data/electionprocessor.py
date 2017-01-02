@@ -84,6 +84,8 @@ class ElectionData:
 
 		self.train_tweets = [ElectionData.replace_target(self.train_tweets[i], self.train_targets[i]) for i in range(len(self.train_tweets))]
 		self.test_tweets = [ElectionData.replace_target(self.test_tweets[i], self.test_targets[i]) for i in range(len(self.test_tweets))]
+		self.train_targets = [train_target.split('_') for train_target in self.train_targets]
+		self.test_targets = [test_target.split('_') for test_target in self.test_targets]
 
 		# Padding tweets (manually adding '<PAD> tokens')
 		if not self.dynamic_padding:
@@ -114,10 +116,12 @@ class ElectionData:
 				self.test_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in tweet] for tweet in self.test_tweets])
 				self.test_left_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in tweet] for tweet in self.test_left_tweets])
 				self.test_right_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in tweet] for tweet in self.test_right_tweets])
+				self.train_target_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in target] for target in self.train_targets])
+				self.test_target_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in target] for target in self.test_targets])
 
-				self.train_df = [(self.train_x[i], self.train_left_x[i], self.train_right_x[i], self.train_y[i]) 
+				self.train_df = [(self.train_x[i], self.train_left_x[i], self.train_right_x[i], self.train_target_x[i], self.train_y[i]) 
 								for i in range(len(self.train_x))]
-				self.test_df = [(self.test_x[i], self.test_left_x[i], self.test_right_x[i], self.test_y[i]) 
+				self.test_df = [(self.test_x[i], self.test_left_x[i], self.test_right_x[i], self.test_target_x[i], self.test_y[i]) 
 								for i in range(len(self.test_x))]
 
 				train_y = np.array([d[-1] for d in self.train_df])
@@ -187,6 +191,7 @@ class ElectionData:
 		self.train_left_size = np.array([len(seq) for seq in self.train_left_x])
 		self.train_right_x = np.array([d[2] for d in self.train_df])
 		self.train_right_size = np.array([len(seq) for seq in self.train_right_x])
+		self.train_target_x = np.array([d[3] for d in self.train_df])
 		self.train_x = util.pad_sequences(self.train_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT') # Padding
 		self.train_left_x = util.pad_sequences(self.train_left_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
 		self.train_right_x = util.pad_sequences(self.train_right_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
@@ -201,6 +206,7 @@ class ElectionData:
 		self.dev_left_size = np.array([len(seq) for seq in self.dev_left_x])
 		self.dev_right_x = np.array([d[2] for d in self.dev_df])
 		self.dev_right_size = np.array([len(seq) for seq in self.dev_right_x])
+		self.dev_target_x = np.array([d[3] for d in self.dev_df])
 		self.dev_x = util.pad_sequences(self.dev_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT') # Padding
 		self.dev_left_x = util.pad_sequences(self.dev_left_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
 		self.dev_right_x = util.pad_sequences(self.dev_right_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
@@ -215,6 +221,7 @@ class ElectionData:
 		self.test_left_size = np.array([len(seq) for seq in self.test_left_x])
 		self.test_right_x = np.array([d[2] for d in self.test_df])
 		self.test_right_size = np.array([len(seq) for seq in self.test_right_x])
+		self.test_target_x = np.array([d[3] for d in self.test_df])
 		self.test_x = util.pad_sequences(self.test_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT') # Padding
 		self.test_left_x = util.pad_sequences(self.test_left_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
 		self.test_right_x = util.pad_sequences(self.test_right_x, dynamic_padding=self.dynamic_padding, pad_location='RIGHT')
@@ -238,6 +245,7 @@ class ElectionData:
 		x = np.array([d[0] for d in df])
 		xl = np.array([d[1] for d in df])
 		xr = np.array([d[2] for d in df])
+		tar = np.array([d[3] for d in df])
 		y = np.array([d[-1] for d in df])
 		y = pd.get_dummies(y).values.astype(np.int32)
 		seq_len = [len(seq) for seq in x]
@@ -248,7 +256,7 @@ class ElectionData:
 			xl = np.array(self.pad_minibatches(xl, 'RIGHT'))
 			xr = np.array(self.pad_minibatches(xr, 'RIGHT'))
 		self.pointer += 1
-		return x, y, seq_len, xl, seq_len_l, xr, seq_len_r
+		return x, y, seq_len, xl, seq_len_l, xr, seq_len_r, tar
 
 	def reset_batch_pointer(self):
 		self.train_df = self.shuffle_data(self.train_df)
