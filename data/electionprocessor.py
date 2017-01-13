@@ -118,6 +118,7 @@ class ElectionData:
 				self.test_right_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in tweet] for tweet in self.test_right_tweets])
 				self.train_target_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in target] for target in self.train_targets])
 				self.test_target_x = np.array([[self.glove_vocab_dict[token] if token in glove_vocab else 1193514 for token in target] for target in self.test_targets])
+				self.train_y = pd.get_dummies(self.train_y).values.astype(np.int32)
 
 				self.train_df = [(self.train_x[i], self.train_left_x[i], self.train_right_x[i], self.train_target_x[i], self.train_y[i]) 
 								for i in range(len(self.train_x))]
@@ -174,7 +175,7 @@ class ElectionData:
 		right = [i for i in reversed(right)]
 		return left, right
 
-	def build_train_dev(self, train_y, dev_size=0.3, random_seed=42):
+	def build_train_dev(self, train_y, dev_size=0.2, random_seed=42):
 		return train_test_split(
 			self.train_df,
 			test_size=dev_size,
@@ -230,8 +231,8 @@ class ElectionData:
 		self.test_right_x = np.array(self.test_right_x)
 
 		# Vectorizing labels
-		self.train_y = pd.get_dummies(self.train_y).values.astype(np.int32)
-		self.dev_y = pd.get_dummies(self.dev_y).values.astype(np.int32)
+		# self.train_y = pd.get_dummies(self.train_y).values.astype(np.int32)
+		# self.dev_y = pd.get_dummies(self.dev_y).values.astype(np.int32)
 		self.test_y = pd.get_dummies(self.test_y).values.astype(np.int32)
 
 		# Creating training batches
@@ -239,6 +240,9 @@ class ElectionData:
 		if self.num_batches==0:
 			assert False, "Not enough data for the batch size."
 		self.batch_df = np.array_split(self.train_df, self.num_batches) # Splitting train set into batches based on num_batches
+		
+		assert np.array([d[-1] for d in self.batch_df[-1]]).shape[1] == 3, "Watch out! All batches must contain 3 labels!"
+
 
 	def next_batch(self):
 		df = self.batch_df[self.pointer]
@@ -247,7 +251,7 @@ class ElectionData:
 		xr = np.array([d[2] for d in df])
 		tar = np.array([d[3] for d in df])
 		y = np.array([d[-1] for d in df])
-		y = pd.get_dummies(y).values.astype(np.int32)
+		# y = pd.get_dummies(y).values.astype(np.int32)
 		seq_len = [len(seq) for seq in x]
 		seq_len_l = [len(seq) for seq in xl]
 		seq_len_r = [len(seq) for seq in xr]
