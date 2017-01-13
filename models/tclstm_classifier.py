@@ -15,12 +15,12 @@ class TCLSTMClassifier:
 		self.dropout_output = args.dropout_output
 		
 		self.embedding_init = embedding_init
-		self.xl = tf.placeholder(tf.int32, [None, None])
-		self.xr = tf.placeholder(tf.int32, [None, None])
-		self.tar = tf.placeholder(tf.float32, [None, 1, 100])
-		self.y = tf.placeholder(tf.int32, [None, self.num_classes])
-		self.seq_len_l = tf.placeholder(tf.int64, [None])
-		self.seq_len_r = tf.placeholder(tf.int64, [None])
+		self.xl = tf.placeholder(tf.int32, [None, None], 'left_input')
+		self.xr = tf.placeholder(tf.int32, [None, None], 'right_input')
+		self.tar = tf.placeholder(tf.float32, [None, 1, 100], 'target_input')
+		self.y = tf.placeholder(tf.int32, [None, self.num_classes], 'labels')
+		self.seq_len_l = tf.placeholder(tf.int64, [None], 'left_input_length')
+		self.seq_len_r = tf.placeholder(tf.int64, [None], 'right_input_length')
 
 
 	def inference(self, forward_only=None):

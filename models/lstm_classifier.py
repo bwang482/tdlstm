@@ -14,9 +14,9 @@ class LSTMClassifier:
 		self.dropout_output = args.dropout_output
 
 		self.embedding_init = embedding_init
-		self.x = tf.placeholder(tf.int32, [None, None])
-		self.y = tf.placeholder(tf.int32, [None, self.num_classes])
-		self.seq_len = tf.placeholder(tf.int64, [None])
+		self.x = tf.placeholder(tf.int32, [None, None], 'input')
+		self.y = tf.placeholder(tf.int32, [None, self.num_classes], 'labels')
+		self.seq_len = tf.placeholder(tf.int64, [None], 'input_length')
 
 
 	def inference(self, forward_only=None):
