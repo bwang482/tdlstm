@@ -12,6 +12,8 @@ class LSTMClassifier:
 		self.num_hidden = args.num_hidden
 		self.num_classes = args.num_classes
 		self.dropout_output = args.dropout_output
+		self.dropout_input = args.dropout_input
+		self.clip_norm = args.clip_norm
 
 		self.embedding_init = embedding_init
 		self.x = tf.placeholder(tf.int32, [None, None], 'input')
@@ -35,10 +37,9 @@ class LSTMClassifier:
 				if not forward_only:
 					lstm_cell = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_cell, output_keep_prob=self.dropout_output)
 				# lstm_cell = tf.nn.rnn_cell.MultiRNNCell(cells=[lstm_cell] * 4, state_is_tuple=True)
-				# if not forward_only:
-				# 	lstm_cell = tf.nn.rnn_cell.DropoutWrapper(cell=lstm_cell, output_keep_prob=self.dropout_output)
-			# if not forward_only:
-			# 	embed_inputs = tf.nn.dropout(embed_inputs, keep_prob=0.7)
+
+			if not forward_only:
+				embed_inputs = tf.nn.dropout(embed_inputs, keep_prob=self.dropout_input)
 
 			rnn_outputs, output_states  = tf.nn.dynamic_rnn(
 				cell=lstm_cell,
@@ -58,6 +59,7 @@ class LSTMClassifier:
 									# initializer=tf.truncated_normal_initializer(stddev=0.1))
 				b = tf.get_variable('b', [self.num_classes], initializer=tf.constant_initializer(0.1))
 			logits = tf.matmul(last_outputs, W) + b
+		self.embed_inputs = embed_inputs
 		return logits
 
 
@@ -80,11 +82,13 @@ class LSTMClassifier:
 	
 	def training(self, cost):
 		optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
-		# optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
-		# gvs = optimizer.compute_gradients(cost)
-		# capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
-		# train_op = optimizer.apply_gradients(capped_gvs)
-		train_op = optimizer.minimize(cost)
+		# train_op = optimizer.minimize(cost)
+		
+		trainables = tf.trainable_variables()
+		grads = tf.gradients(cost, trainables)
+		grads, _ = tf.clip_by_global_norm(grads, clip_norm=self.clip_norm)
+		capped_gvs = zip(grads, trainables)
+		train_op = optimizer.apply_gradients(capped_gvs)
 		return train_op
 
 

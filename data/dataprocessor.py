@@ -30,6 +30,7 @@ class streamtw(object):
                     target=line.lower().strip()
                 if self.i==3:
                     senti=int(line.strip())+2
+                    tw = tw.replace('$t$', target) #using already preprocessed data from Tang et al. 2016
                     tw=tw.replace(target,' '+target+' ')
                     tw=tw.replace(''.join(target.split()),' '+'_'.join(target.split())+' ')
                     tw=tw.replace(target,' '+'_'.join(target.split())+' ')
@@ -40,8 +41,8 @@ class streamtw(object):
 
 class LidongData:
 	def __init__(self, batch_size, dynamic_padding=False, preprocessing=False, embedding=True, saved=False, max_length=None):
-		train = LidongData.read_data('../data/lidong-data/training/')
-		test = LidongData.read_data('../data/lidong-data/testing/')
+		train = LidongData.read_data('../data/lidong-preprocessed/training/')
+		test = LidongData.read_data('../data/lidong-preprocessed/testing/')
 		self.batch_size = batch_size
 		self.dynamic_padding = dynamic_padding
 		self.train_tweets, self.train_targets, self.train_y = zip(*train)
@@ -72,7 +73,8 @@ class LidongData:
 			glove, self.glove_vec, self.glove_shape, glove_vocab = util.gensim_load_vec('../resources/wordemb/glove.twitter.word2vec.27B.100d.txt')
 			glove_vocab = [token.encode('utf-8') for token in glove_vocab]
 			self.glove_vocab_dict = {j:i for i, j in enumerate(glove_vocab)}
-			self.glove_vec = np.append(self.glove_vec, [[0]*self.glove_shape[1]], axis=0)
+			# self.glove_vec = np.append(self.glove_vec, [[0]*self.glove_shape[1]], axis=0)
+			self.glove_vec = np.append(self.glove_vec, np.mean(self.glove_vec, axis=0).reshape(1,100), axis=0)
 			self.glove_shape = [self.glove_shape[0]+1, self.glove_shape[1]]
 			print(' - DONE')
 			print("time taken: %f mins"%((time.clock() - start)/60))
@@ -143,7 +145,7 @@ class LidongData:
 		right = [i for i in reversed(right)]
 		return left, right
 
-	def build_train_dev(self, train_y, dev_size=0.2, random_seed=42):
+	def build_train_dev(self, train_y, dev_size=0.15, random_seed=42):
 		return train_test_split(
 			self.train_df,
 			test_size=dev_size,

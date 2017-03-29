@@ -47,7 +47,8 @@ class LSTM:
 		scoring_list = []
 		best_eval_score = []
 
-		with tf.Session() as sess:
+		with tf.Session(config=tf.ConfigProto(
+			allow_soft_placement=FLAGS.allow_soft_placement, log_device_placement=FLAGS.log_device_placement)) as sess:
 			t0 = time.time()
 			saver = tf.train.Saver()
 			writer = tf.train.SummaryWriter("../output")
@@ -71,7 +72,7 @@ class LSTM:
 					total_loss = 0.0
 					total_acc = 0.0
 					for step in range(data.num_batches):
-						x, y, seq_length, _, _, _, _ = data.next_batch()
+						x, y, seq_length, _, _, _, _, _ = data.next_batch()
 						feed={model.x: x, model.y: y, model.seq_len: seq_length}
 						sess.run(self.train_op, feed)
 						current_loss, current_acc, _ = sess.run(self.train_loss, feed)
@@ -91,7 +92,8 @@ class LSTM:
 					# acc_summ = tf.scalar_summary("{0}_accuracy".format(str_summary_type), self.total_train_acc.assign(total_acc/data.num_batches))
 					# train_summary = tf.merge_summary([loss_summ, acc_summ])
 					# writer.add_summary(train_summary, epoch)
-					writer.add_summary(eval_summary, epoch)
+					# writer.add_summary(eval_summary, epoch)
+					
 					self.plotter.add_values(epoch,
 									loss_train=total_loss/data.num_batches, acc_train=total_acc/data.num_batches,
 									loss_val=dev_loss_value, acc_val=dev_score[0])
@@ -101,8 +103,8 @@ class LSTM:
 						best_eval_score = max(best_eval_score,key=itemgetter(1)) if FLAGS.scoring_metrics=='3classf1' else \
 						                  max(best_eval_score,key=itemgetter(0)) if FLAGS.scoring_metrics=='accuracy' \
 						                  else max(best_eval_score,key=itemgetter(2))
-						print("Final Dev Accuracy = {:.5f}; 3-class F1 = {:.5f}; 2-class F1 = {:.5f}"
-								.format(best_eval_score[0], best_eval_score[1], best_eval_score[2]))
+						print("Final dev loss = {:.5f}; Dev Accuracy = {:.5f}; 3-class F1 = {:.5f}; 2-class F1 = {:.5f}"
+								.format(dev_loss_value, best_eval_score[0], best_eval_score[1], best_eval_score[2]))
 						if not self.tuning:
 							t1 = time.time()
 							print("time taken: %f mins"%((t1-t0)/60))

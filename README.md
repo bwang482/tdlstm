@@ -1,6 +1,9 @@
 # TDLSTM
-This Tensorflow implementation approximates the Target-dependent LSTMs proposed in (Tang et al. 2015).
+This Tensorflow implementation approximates the Target-dependent LSTMs proposed in (Tang et al. 2016).
 
-##TO-DO
-* Update code to be compatible with the latest version of Tensorflow (currently compatible with v0.10-0.12)
-* Bayesian hyperparameter optimization using Spearmint
+## Updated
+* Randomized search for hyperparameter optimization is now added.
+* Hyperopt and Scikit-optimize (can choose from gp_minimize, forest_minimize and gbrt_minimize) for hyperparameter optimization are now added.
+
+## TO-DO
+* Update code to be compatible with the latest version of Tensorflow (currently compatible with v0.10-0.12).

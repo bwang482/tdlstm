@@ -47,7 +47,8 @@ class TDLSTM:
 		scoring_list = []
 		best_eval_score = []
 
-		with tf.Session() as sess:
+		with tf.Session(config=tf.ConfigProto(
+			allow_soft_placement=FLAGS.allow_soft_placement, log_device_placement=FLAGS.log_device_placement)) as sess:
 			t0 = time.time()
 			saver = tf.train.Saver()
 			if FLAGS.restore and FLAGS.checkpoint_file:
@@ -69,7 +70,6 @@ class TDLSTM:
 
 					total_loss = 0.0
 					total_acc = 0.0
-					# fw_state, bw_state = sess.run([model.fw_initial_state, model.bw_initial_state])
 					for step in range(data.num_batches):
 						x, y, seq_length, xl, seq_length_l, xr, seq_length_r, _ = data.next_batch()
 						feed={model.xl: xl, model.xr: xr, model.y: y, model.seq_len_l: seq_length_l, model.seq_len_r: seq_length_r}
@@ -96,7 +96,7 @@ class TDLSTM:
 						best_eval_score = max(best_eval_score,key=itemgetter(1)) if FLAGS.scoring_metrics=='3classf1' else \
 						                  max(best_eval_score,key=itemgetter(0)) if FLAGS.scoring_metrics=='accuracy' \
 						                  else max(best_eval_score,key=itemgetter(2))
-						print("Final Dev Accuracy = {:.5f}; 3-class F1 = {:.5f}; 2-class F1 = {:.5f}"
+						print("Final dev loss = {:.5f}; Dev Accuracy = {:.5f}; 3-class F1 = {:.5f}; 2-class F1 = {:.5f}"
 								.format(best_eval_score[0], best_eval_score[1], best_eval_score[2]))
 						if not self.tuning:
 							t1 = time.time()

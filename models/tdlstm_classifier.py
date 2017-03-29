@@ -13,6 +13,8 @@ class TDLSTMClassifier:
 		self.batch_size = args.batch_size+1
 		self.num_classes = args.num_classes
 		self.dropout_output = args.dropout_output
+		self.dropout_input = args.dropout_input
+		self.clip_norm = args.clip_norm
 		
 		self.embedding_init = embedding_init
 		self.xl = tf.placeholder(tf.int32, [None, None], 'left_input')
@@ -55,9 +57,9 @@ class TDLSTMClassifier:
 			# self.fw_initial_state = lstm_fw_cell.zero_state(self.batch_size, tf.float32) #initial states
 			# self.bw_initial_state = lstm_bw_cell.zero_state(self.batch_size, tf.float32)
 
-			# if not forward_only:
-			# 	embed_inputs_fw = tf.nn.dropout(embed_inputs_fw, keep_prob=0.5)
-			# 	embed_inputs_bw = tf.nn.dropout(embed_inputs_bw, keep_prob=0.5)
+			if not forward_only:
+				embed_inputs_fw = tf.nn.dropout(embed_inputs_fw, keep_prob=self.dropout_input)
+				embed_inputs_bw = tf.nn.dropout(embed_inputs_bw, keep_prob=self.dropout_input)
 
 			with tf.variable_scope("forward_lstm"):
 				outputs_fw, output_states_fw  = tf.nn.dynamic_rnn(
@@ -104,15 +106,15 @@ class TDLSTMClassifier:
 	def training(self, cost):
 		optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
 		# optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
+		# train_op = optimizer.minimize(cost)
 		# gvs = optimizer.compute_gradients(cost)
 		# capped_gvs = [(tf.clip_by_norm(grad, 1.0), var) for grad, var in gvs]
 
-		# trainables = tf.trainable_variables()
-		# grads = tf.gradients(cost, trainables)
-		# grads, _ = tf.clip_by_global_norm(grads, clip_norm=1.0)
-		# capped_gvs = zip(grads, trainables)
-		# train_op = optimizer.apply_gradients(capped_gvs)
-		train_op = optimizer.minimize(cost)
+		trainables = tf.trainable_variables()
+		grads = tf.gradients(cost, trainables)
+		grads, _ = tf.clip_by_global_norm(grads, clip_norm=self.clip_norm)
+		capped_gvs = zip(grads, trainables)
+		train_op = optimizer.apply_gradients(capped_gvs)
 		return train_op
 
 
