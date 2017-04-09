@@ -101,7 +101,7 @@ class TCLSTM:
 						                  max(eval_scores,key=itemgetter(0)) if FLAGS.scoring_metrics=='accuracy' \
 						                  else max(eval_scores,key=itemgetter(2))
 						print("Final dev loss = {:.5f}; Dev Accuracy = {:.5f}; 3-class F1 = {:.5f}; 2-class F1 = {:.5f}"
-								.format(best_eval_score[0], best_eval_score[1], best_eval_score[2]))
+								.format(dev_loss_value, best_eval_score[0], best_eval_score[1], best_eval_score[2]))
 						if not self.tuning:
 							t1 = time.time()
 							print("time taken: %f mins"%((t1-t0)/60))
