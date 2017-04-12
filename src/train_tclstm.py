@@ -62,6 +62,8 @@ class TCLSTM:
 						model.seq_len_l: data.test_left_size, model.seq_len_r: data.test_right_size, 
 						model.tar: test_target_vec}
 				test_loss_value, test_score = self.final_test(sess, feed)
+
+				return test_score
 			else:
 				sess.run(self.init)
 				coord = tf.train.Coordinator()
@@ -117,7 +119,7 @@ class TCLSTM:
 		# if not FLAGS.restore:
 		# 	plotter.block()
 
-		return test_score, best_eval_score
+			return test_score, best_eval_score
 
 
 	def eval(self, session, feed, saver, early_stopping_rounds, early_stopping_metric_list, early_stopping_metric_minimize=False, metrics='accuracy'):

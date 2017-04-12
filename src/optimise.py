@@ -1,4 +1,7 @@
+from __future__ import print_function
+from __future__ import division
 import random
+import time
 import itertools as it
 import numpy as np
 import tensorflow as tf
@@ -45,7 +48,8 @@ def skopt_search(args, data, model, param_grid, skopt_method, n_calls):
         args.batch_size = params['batch_size']
         print(args)
         print()
-        test_score, eval_score = run_network(args, data, model, tuning=args.tune)
+        scores = run_network(args, data, model, tuning=args.tune)
+        test_score, eval_score = scores
         tf.reset_default_graph()
         eval_score = -eval_score[0]
         return eval_score
@@ -89,7 +93,8 @@ def hyperopt_search(args, data, model, param_grid, max_evals):
         # args.learning_rate = param_grid['learning_rate']
         print(args)
         print()
-        test_score, eval_score = run_network(args, data, model, tuning=args.tune)
+        scores = run_network(args, data, model, tuning=args.tune)
+        test_score, eval_score = scores
         tf.reset_default_graph()
         eval_score = -eval_score[0]
         return {'loss': eval_score, 'params': args, 'status': STATUS_OK}
@@ -143,7 +148,8 @@ def TUNE(args, model, mode, n_calls=5):
         print("Evaluating hyperparameters:", hyperparameters)
         for attr, value in hyperparameters.items():
             setattr(args, attr, value)
-        test_score, eval_score = run_network(args, data, model, tuning=args.tune)
+        scores = run_network(args, data, model, tuning=args.tune)
+        test_score, eval_score = scores
         if eval_score[0] > maxx:
             maxx = eval_score[0]
             best_score = test_score
@@ -163,6 +169,7 @@ def TUNE(args, model, mode, n_calls=5):
 
 
 def TRAIN(args, model):
+    t0 = time.time()
     print("\nParameters:")
     for attr, value in sorted(vars(args).items()):
         print("{}={}".format(attr.upper(), value))
@@ -178,16 +185,16 @@ def TRAIN(args, model):
 def run_network(args, data, model, tuning=False):
     if model == 'LSTM':
         nn = LSTM(args, data, tuning=tuning)
-        test_score, eval_score = nn.train_lstm(args, data)
-        return test_score, eval_score
+        scores = nn.train_lstm(args, data)
+        return scores
     elif model =='TDLSTM':
         nn = TDLSTM(args, data, tuning=tuning)
-        test_score, eval_score = nn.train_tdlstm(args, data)
-        return test_score, eval_score
+        scores = nn.train_tdlstm(args, data)
+        return scores
     elif model =='TCLSTM':
         nn = TCLSTM(args, data, tuning=tuning)
-        test_score, eval_score = nn.train_tclstm(args, data)
-        return test_score, eval_score
+        scores = nn.train_tclstm(args, data)
+        return scores
     else:
         print("No such model; please select from LSTM, TDLSTM or TCLSTM")
 

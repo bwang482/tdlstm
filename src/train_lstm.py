@@ -60,6 +60,8 @@ class LSTM:
 				# feed = {model.x: data.dev_x, model.y: data.dev_y, model.seq_len: data.dev_size}
 				feed = {model.x: data.test_x, model.y: data.test_y, model.seq_len: data.test_size}
 				test_loss_value, test_score = self.final_test(sess, feed)
+
+				return test_score
 			else:
 				sess.run(self.init)
 				coord = tf.train.Coordinator()
@@ -120,7 +122,7 @@ class LSTM:
 		# if not FLAGS.restore:
 		# 	self.plotter.block()
 
-		return test_score, best_eval_score
+			return test_score, best_eval_score
 
 
 	def eval(self, session, feed, saver, early_stopping_rounds, early_stopping_metric_list, early_stopping_metric_minimize=False, metrics='accuracy'):

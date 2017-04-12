@@ -175,7 +175,7 @@ class ElectionData:
 		right = [i for i in reversed(right)]
 		return left, right
 
-	def build_train_dev(self, train_y, dev_size=0.2, random_seed=42):
+	def build_train_dev(self, train_y, dev_size=0.3, random_seed=42):
 		return train_test_split(
 			self.train_df,
 			test_size=dev_size,
