@@ -7,7 +7,7 @@ from collections import Counter
 
 
 def gensim_load_vec(path):
-    gensim_emb = gensim.models.Word2Vec.load_word2vec_format(path, binary=False)
+    gensim_emb = gensim.models.KeyedVectors.load_word2vec_format(path, binary=False)
     vocab = gensim_emb.index2word
     vec = gensim_emb.syn0
     shape = gensim_emb.syn0.shape
