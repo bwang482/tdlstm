@@ -64,7 +64,7 @@ class LSTMClassifier:
 
 
 	def loss(self, logits, forward_only=None):
-		cost = tf.nn.softmax_cross_entropy_with_logits(logits, tf.cast(self.y, tf.float32))
+		cost = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=tf.cast(self.y, tf.float32))
 		mean_cost = tf.reduce_mean(cost)
 		y_pred = tf.argmax(logits, 1)
 		correct_pred = tf.equal(y_pred, tf.argmax(self.y, 1))
@@ -72,9 +72,9 @@ class LSTMClassifier:
 
 		if forward_only:
 			str_summary_type = 'eval'
-			loss_summ = tf.scalar_summary("{0}_loss".format(str_summary_type), mean_cost)
-			acc_summ = tf.scalar_summary("{0}_accuracy".format(str_summary_type), accuracy)
-			merged = tf.merge_summary([loss_summ, acc_summ])
+			loss_summ = tf.summary.scalar("{0}_loss".format(str_summary_type), mean_cost)
+			acc_summ = tf.summary.scalar("{0}_accuracy".format(str_summary_type), accuracy)
+			merged = tf.summary.merge([loss_summ, acc_summ])
 			return mean_cost, accuracy, y_pred, merged
 		else:
 			return mean_cost, accuracy, y_pred
@@ -94,15 +94,15 @@ class LSTMClassifier:
 
 	@staticmethod
 	def seq_length(data):
-		used = tf.sign(tf.reduce_max(tf.abs(data), reduction_indices=2))
-		length = tf.reduce_sum(used, reduction_indices=1)
+		used = tf.sign(tf.reduce_max(tf.abs(data), axis=2))
+		length = tf.reduce_sum(used, axis=1)
 		length = tf.cast(length, tf.int64)
 		return length
 
 	@staticmethod
 	def last_relevant(outputs, length):
 		# Borrowed from: https://gist.github.com/rockt/f4f9df5674f3da6a32786bcf9fbb6a88
-		batch_size, max_length, hidden_size = tf.unpack(tf.shape(outputs))
+		batch_size, max_length, hidden_size = tf.unstack(tf.shape(outputs))
 		index = tf.range(0, batch_size) * max_length + (tf.cast(length, tf.int32) - 1)
 		flat = tf.reshape(outputs, [-1, hidden_size])
 		relevant = tf.gather(flat, index)

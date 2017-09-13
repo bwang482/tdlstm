@@ -37,8 +37,8 @@ class LSTM:
 		                     show_plot_window=True,
 		                     x_label="Epoch")
 
-		self.init = tf.group(tf.initialize_all_variables(),
-					tf.initialize_local_variables())
+		self.init = tf.group(tf.global_variables_initializer(),
+					tf.local_variables_initializer())
 		print("Network initialized..")
 
 
@@ -51,7 +51,7 @@ class LSTM:
 			allow_soft_placement=FLAGS.allow_soft_placement, log_device_placement=FLAGS.log_device_placement)) as sess:
 			t0 = time.time()
 			saver = tf.train.Saver()
-			writer = tf.train.SummaryWriter("../output")
+			writer = tf.summary.FileWriter("../output")
 			if FLAGS.restore and FLAGS.checkpoint_file:
 				print()
 				print("Loading model from '%s' .." % FLAGS.checkpoint_file)

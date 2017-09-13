@@ -73,8 +73,8 @@ class LidongData:
 			glove, self.glove_vec, self.glove_shape, glove_vocab = util.gensim_load_vec('../resources/wordemb/glove.twitter.word2vec.27B.100d.txt')
 			glove_vocab = [token.encode('utf-8') for token in glove_vocab]
 			self.glove_vocab_dict = {j:i for i, j in enumerate(glove_vocab)}
-			# self.glove_vec = np.append(self.glove_vec, [[0]*self.glove_shape[1]], axis=0)
-			self.glove_vec = np.append(self.glove_vec, np.mean(self.glove_vec, axis=0).reshape(1,100), axis=0)
+			self.glove_vec = np.append(self.glove_vec, [[0]*self.glove_shape[1]], axis=0)
+			# self.glove_vec = np.append(self.glove_vec, np.mean(self.glove_vec, axis=0).reshape(1,100), axis=0)
 			self.glove_shape = [self.glove_shape[0]+1, self.glove_shape[1]]
 			print(' - DONE')
 			print("time taken: %f mins"%((time.clock() - start)/60))

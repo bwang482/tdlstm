@@ -29,14 +29,14 @@ class TCLSTMClassifier:
 
 		embed_inputs_fw = tf.nn.embedding_lookup(self.embedding_init, self.xl) ## (batch_size, seq_len, 100)
 		embed_inputs_bw = tf.nn.embedding_lookup(self.embedding_init, self.xr) ## (batch_size, seq_len, 100)
-		shape_fw = tf.unpack(tf.shape(embed_inputs_fw))[1]
-		shape_bw = tf.unpack(tf.shape(embed_inputs_bw))[1]
+		shape_fw = tf.unstack(tf.shape(embed_inputs_fw))[1]
+		shape_bw = tf.unstack(tf.shape(embed_inputs_bw))[1]
 		tar_fw = tf.tile(self.tar, [1,shape_fw,1])
 		tar_bw = tf.tile(self.tar, [1,shape_bw,1])
 		tar_fw.set_shape([None, None, 100])
 		tar_bw.set_shape([None, None, 100])
-		embed_inputs_fw = tf.concat(2, [embed_inputs_fw,tar_fw])
-		embed_inputs_bw = tf.concat(2, [embed_inputs_bw,tar_bw])
+		embed_inputs_fw = tf.concat(axis=2, values=[embed_inputs_fw,tar_fw])
+		embed_inputs_bw = tf.concat(axis=2, values=[embed_inputs_bw,tar_bw])
 
 		with tf.variable_scope('hidden', reuse=forward_only):
 			with tf.variable_scope('forward_lstm_cell'):
@@ -90,7 +90,7 @@ class TCLSTMClassifier:
 
 			last_outputs_fw = self.last_relevant(outputs_fw, self.seq_len_l) ## (batch_size, num_hidden)
 			last_outputs_bw = self.last_relevant(outputs_bw, self.seq_len_r) ## (batch_size, num_hidden)
-			last_outputs = tf.concat(1, [last_outputs_fw, last_outputs_bw]) ## (batch_size, num_hidden*2)
+			last_outputs = tf.concat(axis=1, values=[last_outputs_fw, last_outputs_bw]) ## (batch_size, num_hidden*2)
 
 		with tf.variable_scope('output', reuse=forward_only):
 			with tf.variable_scope('softmax'):
@@ -104,7 +104,7 @@ class TCLSTMClassifier:
 
 
 	def loss(self, logits, forward_only=None):
-		cost = tf.nn.softmax_cross_entropy_with_logits(logits, tf.cast(self.y, tf.float32))
+		cost = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=tf.cast(self.y, tf.float32))
 		mean_cost = tf.reduce_mean(cost)
 		y_pred = tf.argmax(logits, 1)
 		correct_pred = tf.equal(y_pred, tf.argmax(self.y, 1))
@@ -130,15 +130,15 @@ class TCLSTMClassifier:
 
 	@staticmethod
 	def seq_length(data):
-		used = tf.sign(tf.reduce_max(tf.abs(data), reduction_indices=2))
-		length = tf.reduce_sum(used, reduction_indices=1)
+		used = tf.sign(tf.reduce_max(tf.abs(data), axis=2))
+		length = tf.reduce_sum(used, axis=1)
 		length = tf.cast(length, tf.int64)
 		return length
 
 	@staticmethod
 	def last_relevant(outputs, length):
 		# Borrowed from: https://gist.github.com/rockt/f4f9df5674f3da6a32786bcf9fbb6a88
-		batch_size, max_length, hidden_size = tf.unpack(tf.shape(outputs))
+		batch_size, max_length, hidden_size = tf.unstack(tf.shape(outputs))
 		index = tf.range(0, batch_size) * max_length + (tf.cast(length, tf.int32) - 1)
 		flat = tf.reshape(outputs, [-1, hidden_size])
 		relevant = tf.gather(flat, index)

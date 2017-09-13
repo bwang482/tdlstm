@@ -37,8 +37,8 @@ class TDLSTM:
 		                     show_plot_window=True,
 		                     x_label="Epoch")
 
-		self.init = tf.group(tf.initialize_all_variables(),
-					tf.initialize_local_variables())
+		self.init = tf.group(tf.global_variables_initializer(),
+					tf.local_variables_initializer())
 		print("Network initialized..")
 
 
